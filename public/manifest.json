@@ -11,7 +11,7 @@
   "content_scripts": [
     {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["/static/js/main.fa1dd7e0.js"],
+      "js": ["/static/js/main.b64b7f3f.js"],
       "css": ["/static/css/main.e6c13ad2.css"],
       "run_at": "document_end"
     }
