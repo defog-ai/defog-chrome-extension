@@ -13,52 +13,32 @@ const App = () => {
   const [columns, setColumns] = useState([]);
   const [data, setData] = useState([]);
   const [generatedSql, setGeneratedSql] = useState(null);
+  const [previousQuestions, setPreviousQuestions] = useState([]);
   const [widgetHeight, setWidgetHeight] = useState(40);
-
-  useEffect(() => {
-    setTabItems([
-      {
-        key: "1",
-        label: "Results",
-        children: columns.length > 0 ? 
-          <div style={{ width: 600, height: widgetHeight }}>
-            <Table
-              dataSource={data}
-              columns={columns}
-              loading={loading}
-              style={{
-                height: 380,
-                overflow: "auto",
-              }}
-              size="small"
-            />
-          </div>
-          : null
-        },
-      ,
-      {
-        key: "2",
-        label: "SQL",
-        children: loading ? <pre style={{height: 372, overflow: "auto"}}>Loading...</pre> :<pre style={{ height: 372, width: 600, overflow: "auto", whiteSpace: "pre-wrap", textAlign: "left" }}>{generatedSql}</pre>,
-      },
-    ]);
-  }, [loading]);
+  const [queryReason, setQueryReason] = useState("");
+  const [suggestedQuestions, setSuggestedQuestions] = useState("");
+  const [responseArray, setResponseArray] = useState([]);
 
   const handleSubmit = async (query) => {
     setLoading(true);
-    const response = await fetch('https://test-defog-ikcpfh5tva-uc.a.run.app', {
+    const response = await fetch('https://test-defog-chrome-ext-ikcpfh5tva-uc.a.run.app', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ question: query })
+      body: JSON.stringify({
+        question: query,
+        previous_context: previousQuestions,
+      })
     });
     const data = await response.json();
+    let newCols;
+    let newRows;
     if (data.columns && data?.data.length > 0) {
       const cols = data.columns;
       const rows = data.data;
-      let newCols = [];
-      let newRows = [];
+      newCols = [];
+      newRows = [];
       for (let i = 0; i < cols.length; i++) {
         newCols.push({
           title: cols[i],
@@ -82,8 +62,29 @@ const App = () => {
       setColumns([]);
     }
     setGeneratedSql(data.query_generated);
+    setQueryReason(data.reason_for_query);
+    setSuggestedQuestions(data.suggestion_for_further_questions);
+    const contextQuestions = [
+      {
+        "role": "user",
+        "content": `Please generate a SQL query that answers the following question: ${query}`,
+      },
+      {
+        "role": "assistant",
+        "content": `Generated SQL:\n\`\`\` ${data.query_generated} \`\`\``
+      }
+    ]
+    setPreviousQuestions([...previousQuestions, ...contextQuestions]);
     setWidgetHeight(400);
     setLoading(false);
+
+    setResponseArray([...responseArray, {
+      queryReason: data.reason_for_query,
+      data: newRows,
+      columns: newCols,
+      suggestedQuestions: data.suggestion_for_further_questions,
+      question: query,
+    }]);
   };
 
   return (
@@ -99,6 +100,28 @@ const App = () => {
           onChange={(state) => state.length > 1 ? setIsActive(true) : setIsActive(false)}
         >
           <Panel header="Ask Defog" key="1" style={{ color: '#fff' }}>
+            <div style={{width: 600, maxHeight: 500, overflow: "auto"}} id="results">
+              {responseArray.map((response, index) => {
+                return (
+                  <div key={index}>
+                    <hr style={{borderTop: "1px dashed lightgrey"}}/>
+                    <p style={{ marginTop: 10 }}>{response.question}</p>
+                    <p style={{ color: "grey", fontSize: 12, marginTop: 10 }}>{response.queryReason}</p>
+                    <Table
+                      dataSource={response.data}
+                      columns={response.columns}
+                      style={{
+                        maxHeight: 300,
+                        overflow: "auto",
+                      }}
+                      size="small"
+                      pagination={{ pageSize: 5}}
+                    />
+                    <p style={{ color: "grey", fontSize: 12, marginTop: 10 }}>{response.suggestedQuestions}</p>
+                  </div>
+                )
+              })}
+            </div>
             <Search
               placeholder="input search text"
               allowClear
@@ -109,11 +132,6 @@ const App = () => {
               loading={loading}
               disabled={loading}
             />
-            {columns.length > 0 ? <Tabs
-              defaultActiveKey="1"
-              items={tabItems}
-              onChange={(key) => console.log(key)}
-            /> : null}
           </Panel>
         </Collapse>
       </div>
