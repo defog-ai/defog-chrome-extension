@@ -1,5 +1,5 @@
 /* eslint-disable no-sparse-arrays */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Input, Collapse, Table, Tabs } from 'antd';
 import { CaretRightOutlined } from '@ant-design/icons';
 
@@ -7,17 +7,16 @@ const App = () => {
   const { Search } = Input;
   const { Panel } = Collapse;
   const [isActive, setIsActive] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  const [tabItems, setTabItems] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [columns, setColumns] = useState([]);
-  const [data, setData] = useState([]);
-  const [generatedSql, setGeneratedSql] = useState(null);
   const [previousQuestions, setPreviousQuestions] = useState([]);
   const [widgetHeight, setWidgetHeight] = useState(40);
-  const [queryReason, setQueryReason] = useState("");
-  const [suggestedQuestions, setSuggestedQuestions] = useState("");
   const [responseArray, setResponseArray] = useState([]);
+  const divRef = useRef(null);
+
+  const scrollToDiv = () => {
+    divRef.current.scrollTop = divRef.current.scrollHeight;
+  }
+  
 
   const handleSubmit = async (query) => {
     setLoading(true);
@@ -55,25 +54,11 @@ const App = () => {
         rows["key"] = i;
         newRows.push(row);
       }
-      setData(newRows);
-      setColumns(newCols);
     } else {
-      setData([]);
-      setColumns([]);
+      newCols = [];
+      newRows = [];
     }
-    setGeneratedSql(data.query_generated);
-    setQueryReason(data.reason_for_query);
-    setSuggestedQuestions(data.suggestion_for_further_questions);
-    const contextQuestions = [
-      {
-        "role": "user",
-        "content": `Please generate a SQL query that answers the following question: ${query}`,
-      },
-      {
-        "role": "assistant",
-        "content": `Generated SQL:\n\`\`\` ${data.query_generated} \`\`\``
-      }
-    ]
+    const contextQuestions = [query, data.query_generated]
     setPreviousQuestions([...previousQuestions, ...contextQuestions]);
     setWidgetHeight(400);
     setLoading(false);
@@ -84,12 +69,16 @@ const App = () => {
       columns: newCols,
       suggestedQuestions: data.suggestion_for_further_questions,
       question: query,
+      generatedSql: data.query_generated,
     }]);
+    // scroll to the bottom of the results div
+    const resultsDiv = document.getElementById("results");
+    resultsDiv.scrollTop = resultsDiv.scrollHeight;
   };
 
   return (
     <div style={{ position: 'fixed', bottom: 0, right: 0 }}>
-      <div style={{ padding: 0, color: '#fff', border: "1px solid lightgrey", borderRadius: 10 }} onClick={() => setInputValue('')}>
+      <div style={{ padding: 0, color: '#fff', border: "1px solid lightgrey", borderRadius: 10 }}>
         {/* add a button on the top right of this div with an expand arrow */}
         <Collapse
           bordered={false}
@@ -100,7 +89,7 @@ const App = () => {
           onChange={(state) => state.length > 1 ? setIsActive(true) : setIsActive(false)}
         >
           <Panel header="Ask Defog" key="1" style={{ color: '#fff' }}>
-            <div style={{width: 600, maxHeight: 500, overflow: "auto"}} id="results">
+            <div style={{width: 600, maxHeight: 500, overflow: "auto"}} id="results" ref={divRef}>
               {responseArray.map((response, index) => {
                 return (
                   <div key={index}>
